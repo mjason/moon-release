@@ -11,19 +11,36 @@ info()  { echo "==> $*"; }
 error() { echo "ERROR: $*" >&2; exit 1; }
 
 command -v curl >/dev/null 2>&1 || error "需要安装 curl"
+command -v openssl >/dev/null 2>&1 || error "需要安装 openssl"
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
-[[ "$OS" == "darwin" ]] || error "目前仅支持 macOS"
 
-info "检测到平台: ${OS}-${ARCH}"
+case "$OS" in
+  darwin) PLATFORM="macos" ;;
+  linux)  PLATFORM="linux" ;;
+  *)      error "不支持的平台: $OS（仅支持 macOS / Linux）" ;;
+esac
+
+case "$ARCH" in
+  arm64|aarch64) ARCH_NORM="arm64" ;;
+  x86_64|amd64)  ARCH_NORM="x86_64" ;;
+  *)             error "不支持的架构: $ARCH" ;;
+esac
+
+case "${PLATFORM}-${ARCH_NORM}" in
+  macos-arm64|linux-x86_64) ;;
+  *) error "未发布的组合: ${PLATFORM}-${ARCH_NORM}（目前仅 macos-arm64 / linux-x86_64）" ;;
+esac
+
+info "检测到平台: ${PLATFORM}-${ARCH_NORM}"
 
 info "获取最新版本..."
 TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
   | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
 [[ -n "${TAG:-}" ]] || error "未找到发布版本"
 VERSION=${TAG#v}
-TARBALL="moon-${VERSION}-macos-${ARCH}.tar.gz"
+TARBALL="moon-${VERSION}-${PLATFORM}-${ARCH_NORM}.tar.gz"
 
 info "下载 ${TAG}..."
 TMP_DIR=$(mktemp -d)
